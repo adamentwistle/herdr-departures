@@ -1,0 +1,5 @@
+{
+    "layout:departures": {
+        "ctrl-shift-d": "departures.fold"
+    }
+}
