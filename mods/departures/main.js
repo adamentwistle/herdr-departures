@@ -68,7 +68,7 @@ export default class Departures extends View {
 
   shape() {
     const { width, height } = this.size ?? FIRST_SIZE;
-    return fitBoard(width, height);
+    return fitBoard(width, height, settings()?.zoom || 1);
   }
 
   world() {

@@ -12,6 +12,7 @@ export const HEARTBEAT_MS = 10000; // the clock and clearing done rows
 export const DONE_CLEAR_MS = 300000;
 export const CLACK_GAP_MS = 1200;
 export const FOLD_ROWS = 2; // a folded board keeps the top flight and its reason
+const FOLD_SLACK = 3;
 
 export const WIDTHS = { time: 5, flight: 6, gate: 8, remarks: 10 };
 const GAP_CELLS = 2; // the four gaps between columns, each half a cell
@@ -22,27 +23,42 @@ export const SIDE = 16; // the board's left and right margin
 
 const clamp = (n, low, high) => Math.min(high, Math.max(low, n));
 
-// Sizes for a board of this size. The letter count stays the same as a window grows, so the
-// type grows instead, which is what keeps it readable as a thumbnail. Past the largest
-// cell the extra width goes to DESTINATION.
-export function fitBoard(width, height) {
-  const usable = Math.max(width - 2 * SIDE, 0);
-  const pitch = clamp(Math.floor(usable / (FIXED_CELLS + DEST.usual)), PITCH.least, PITCH.most);
-  const dest = clamp(Math.floor(usable / pitch) - FIXED_CELLS, DEST.least, DEST.most);
-  const cell = pitch - 2;
-  const cellH = Math.round(cell * 1.4);
-  const rowPitch = cellH + 3;
+// Sizes for a board of this size, in the app's units at this zoom. The letter count stays the
+// same as a window grows, so the type grows instead, which is what keeps it readable as a
+// thumbnail. Past the largest cell the extra width goes to DESTINATION.
+//
+// The grid is worked out in the window's own pixels and handed back in the app's units. The app
+// rounds each element to whole pixels, so at a zoom of 1.2 a 22 unit cell drew 26 pixels, not
+// 26.4, and anything placed by adding widths up (the sheen, the column labels, the right margin)
+// drifted further from the cells with every column. Whole pixels add up exactly.
+export function fitBoard(width, height, zoom = 1) {
+  const z = zoom > 0 ? zoom : 1;
+  const unit = (px) => (px + 0.001) / z; // a hair over, so the app's rounding lands on the pixel
+  const usable = Math.max(Math.floor((width - 2 * SIDE) * z), 0);
+  const pitchPx = clamp(Math.floor(usable / (FIXED_CELLS + DEST.usual)), Math.round(PITCH.least * z), Math.round(PITCH.most * z));
+  const dest = clamp(Math.floor(usable / pitchPx) - FIXED_CELLS, DEST.least, DEST.most);
+  const cellGapPx = Math.max(1, Math.round(2 * z));
+  const rowGapPx = Math.max(1, Math.round(3 * z));
+  const cellHPx = Math.round((pitchPx - cellGapPx) * 1.4);
+  const pitch = unit(pitchPx);
+  const cell = unit(pitchPx - cellGapPx);
+  const cellH = unit(cellHPx);
+  const rowPitch = unit(cellHPx + rowGapPx);
   const head = Math.max(36, Math.round(cellH * 1.1));
   const label = Math.max(10, Math.round(cell * 0.42));
   const top = head + label + 8;
   return {
     pitch, cell, cellH, rowPitch, head, label, top, dest,
-    gap: Math.floor(pitch / 2),
+    half: unit(Math.floor(cellHPx / 2)),
+    cellGap: unit(cellGapPx),
+    rowGap: unit(rowGapPx),
+    gap: unit(Math.floor(pitchPx / 2)),
     font: Math.round(cell * 1.08),
     title: Math.round(cellH * 0.72),
     rows: Math.max(1, Math.floor((height - top - 8) / rowPitch)),
     cells: WIDTHS.time + WIDTHS.flight + dest + WIDTHS.gate + WIDTHS.remarks,
-    foldHeight: top + FOLD_ROWS * rowPitch + 8,
+    // The block can come back a pixel short of what was asked (the divider under it), which lost the second row.
+    foldHeight: top + FOLD_ROWS * rowPitch + 8 + FOLD_SLACK,
   };
 }
 
@@ -335,6 +351,11 @@ export class Flaps {
     }
     this.moving = this.moving.filter((cell) => cell.path.length > 0);
     return this.busy;
+  }
+
+  // Whether a cell has stopped on its letter, with nothing still to fall.
+  settled(r, c) {
+    return this.grid[r][c].path.length === 0;
   }
 
   // What a cell shows now: its top half and its bottom half, the same when it's at rest.

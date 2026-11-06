@@ -30,7 +30,7 @@ function face(size, ch) {
 
 // A flap on its way down: the new letter's top half over the old one's bottom half.
 function falling(size, top, bottom, paper) {
-  const half = Math.floor(size.cellH / 2);
+  const half = size.half ?? Math.floor(size.cellH / 2);
   return div().relative().w(size.cell).h(size.cellH).flex_none().rounded(2).bg(paper).overflow_hidden()
     .child(div().absolute().left(0).top(0).w(size.cell).h(half).bg(FLAP).overflow_hidden().child(face(size, top)))
     .child(div().absolute().left(0).top(half).w(size.cell).h(size.cellH - half).overflow_hidden()
@@ -56,17 +56,18 @@ function boardRow(v, i) {
   for (let c = 0; c < shape.cells; c += 1) {
     const glyph = flaps.at(i, c);
     // DELAYED turns its letters over: black on yellow, the one thing on the board that isn't yellow on black.
-    const loud = delayed && c >= remarks && glyph.top !== " ";
+    // A cell turns over once it has landed, so the old remark doesn't show black on yellow while the wave comes.
+    const loud = delayed && c >= remarks && glyph.top !== " " && flaps.settled(i, c);
     const el = cell(shape, glyph, loud ? YELLOW : CELL).when(loud, (e) => e.text_color(INK));
     cells.push(starts.has(c) ? el.ml(shape.gap) : el);
   }
-  const half = Math.floor(shape.cellH / 2);
+  const half = shape.half;
   const left = (c, n) => c.start * shape.pitch + n * shape.gap;
-  return h_flex().id(`row-${i}`).relative().w(left(columns.at(-1), columns.length - 1) + columns.at(-1).width * shape.pitch - 2).h(shape.cellH).flex_none().gap(2).text_color(inkOf(row))
+  return h_flex().id(`row-${i}`).relative().w(left(columns.at(-1), columns.length - 1) + columns.at(-1).width * shape.pitch - shape.cellGap).h(shape.cellH).flex_none().gap(shape.cellGap).text_color(inkOf(row))
     .when(Boolean(row.flight), (el) => el.cursor_pointer().hover((s) => s.bg(PRESS))
       .on_mouse_down("left", stop).on_click(() => v.go(row.flight)))
     .children(cells)
-    .children(columns.map((c, n) => div().absolute().left(left(c, n)).top(0).w(c.width * shape.pitch - 2).h(half).bg(SHEEN)))
+    .children(columns.map((c, n) => div().absolute().left(left(c, n)).top(0).w(c.width * shape.pitch - shape.cellGap).h(half).bg(SHEEN)))
     .child(div().absolute().left(0).right(0).top(half).h(1).bg(INK))
     .when(delayed, (el) => el.child(div().absolute().left(-10).top(0).w(4).h(shape.cellH).bg(YELLOW)
       .loop("opacity", { from: 0.25, to: 1, period: 1200 })));
@@ -109,5 +110,5 @@ export function board(v) {
     .on_size_change(v.onSize).on_hover(v.onHover)
     .child(header(v))
     .child(headings(shape))
-    .child(v_flex().flex_none().px(SIDE).gap(3).text_size(shape.font).children(v.rows.map((_, i) => boardRow(v, i))));
+    .child(v_flex().flex_none().px(SIDE).gap(shape.rowGap).text_size(shape.font).children(v.rows.map((_, i) => boardRow(v, i))));
 }

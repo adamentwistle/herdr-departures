@@ -182,8 +182,11 @@ test("the button folds the board to two rows and back", () => {
 test("sizes are the app's own at any zoom", () => {
   host.zoom = 1.25;
   run = new Run({ width: 1800, height: 500 });
-  assert.equal(run.lines[0].length, fitBoard(1440, 400).cells);
-  assert.equal(run.lines.length, fitBoard(1440, 400).rows);
+  assert.equal(run.lines[0].length, fitBoard(1440, 400, 1.25).cells);
+  assert.equal(run.lines.length, fitBoard(1440, 400, 1.25).rows);
+  // Whole pixels can move a letter between DESTINATION and the margin, or a row off the bottom, no more.
+  assert.ok(Math.abs(run.lines[0].length - fitBoard(1440, 400).cells) <= 1);
+  assert.ok(Math.abs(run.lines.length - fitBoard(1440, 400).rows) <= 1);
 });
 
 test("a resize snaps to the new shape without flipping", () => {
