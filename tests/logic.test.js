@@ -208,6 +208,41 @@ test("the type grows with the window and the letter count holds", () => {
   assert.equal(fitBoard(400, 20).rows, 1);
 });
 
+test("at a fractional zoom every grid size is whole pixels, so sums land on the cells", () => {
+  for (const zoom of [1, 1.1, 1.2, 1.25, 1.5, 2]) {
+    for (const width of [900, 1200, 1440, 1600]) {
+      const s = fitBoard(width / zoom, 400, zoom);
+      for (const key of ["pitch", "cell", "cellH", "half", "gap", "cellGap", "rowGap", "rowPitch"]) {
+        const px = s[key] * zoom;
+        assert.ok(Math.abs(px - Math.round(px)) < 0.01, `${key} at ${zoom} is ${px}px`);
+        assert.equal(Math.round(px), Math.floor(px), `${key} at ${zoom} rounds and floors the same`);
+      }
+      assert.equal(Math.round(s.pitch * zoom), Math.round(s.cell * zoom) + Math.round(s.cellGap * zoom));
+      if (width / zoom >= 600) assert.ok(s.cells * s.pitch + 4 * s.gap <= width / zoom - 2 * SIDE + 0.1, `${width} at ${zoom} fits`);
+    }
+  }
+});
+
+test("a folded board a pixel short still holds the flight and its reason", () => {
+  for (const zoom of [1, 1.2, 1.5]) {
+    const { foldHeight } = fitBoard(1200, 400, zoom);
+    assert.equal(fitBoard(1200, foldHeight - 1, zoom).rows, 2, `at ${zoom}`);
+  }
+});
+
+test("a cell is settled only once it has nothing left to fall", () => {
+  const flaps = new Flaps(1, 6, ["AAAAAA"]);
+  flaps.aim(["BBBBBB"]);
+  assert.equal(flaps.settled(0, 5), false); // waiting for the wave
+  flaps.tick();
+  assert.equal(flaps.settled(0, 0), false); // falling
+  flaps.tick();
+  assert.equal(flaps.settled(0, 0), true);
+  assert.equal(flaps.settled(0, 5), false);
+  while (flaps.tick());
+  assert.equal(flaps.settled(0, 5), true);
+});
+
 test("a flip goes forward and lands on the new letter", () => {
   assert.deepEqual(flipPath("A", "B"), ["B"]);
   assert.deepEqual(flipPath("A", "A"), []);
